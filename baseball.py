@@ -45,15 +45,33 @@ class Baseball():
             direction = '+'
         return direction + str(delta.days)
 
+    def _mlb_find_delta(self, args):
+        delta = None
+        if len(args) > 0 and (args[-1].startswith('-') or args[-1].startswith('+')):
+            delta = args[-1]
+            args = args[:-1]
+        elif len(args) > 0 and len(args[-1].split('/')) in [2,3]:
+            delta = self.convert_date_to_delta(args)
+            args = args[:-1]
+        elif len(args) > 0 and args[-1].lower() in ['yesterday', 'tomorrow']:
+            if args[-1] == 'yesterday':
+                delta = "-1"
+            elif args[-1] == 'tomorrow':
+                delta = "+1"
+            args = args[:-1]
+        return delta, args
+
     @commands.group(pass_context=True)
     async def mlb(self, ctx):
+        args = ctx.message.system_content[5:].split(' ')
+        self.delta, self.args = self._mlb_find_delta(args)
         if ctx.invoked_subcommand is None:
             await self.bot.say("Invalid subcommand passed")
 
-    @mlb.command(pass_context=True, name='line')
-    async def mlb_line(self, ctx, *query:str):
-        player = ' '.join(query)
-        await self.bot.say("```%s```" % mymlbstats.get_player_line(player))
+    @mlb.command(name='line')
+    async def mlb_line(self, *player):
+        player = ' '.join(self.args[1:])
+        await self.bot.say("```%s```" % mymlbstats.get_player_line(player, delta=self.delta))
 
     # @commands.command()
     # async def mlb(self,*team :str):
@@ -102,18 +120,6 @@ class Baseball():
     #             reddit = True
     #             team.remove(i)
     #
-    #     if len(team) > 0 and (team[-1].startswith('-') or team[-1].startswith('+')):
-    #         delta = team[-1]
-    #         team = team[:-1]
-    #     elif len(team) > 0 and len(team[-1].split('/')) in [2,3]:
-    #         delta = self.convert_date_to_delta(team)
-    #         team = team[:-1]
-    #     elif len(team) > 0 and team[-1].lower() in ['yesterday', 'tomorrow']:
-    #         if team[-1] == 'yesterday':
-    #             delta = "-1"
-    #         elif team[-1] == 'tomorrow':
-    #             delta = "+1"
-    #         team = team[:-1]
     #
     #     if len(team) == 0 or (len(team) == 1 and team[0] == 'live'):
     #         liveonly=False
