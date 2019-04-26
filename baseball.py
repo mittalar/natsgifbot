@@ -45,13 +45,6 @@ class Baseball():
             direction = '+'
         return direction + str(delta.days)
 
-
-    @commands.command()
-    async def newmlb(self, *query:str):
-        """New version of mlb command, with proper subcommands (in progress)"""
-        delta = None
-        team = ["wsh" if x.lower() == "nats" else x for x in query]
-
     @commands.command()
     async def mlb(self,*team :str):
         """Get MLB info
