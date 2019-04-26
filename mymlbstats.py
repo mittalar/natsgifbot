@@ -1313,6 +1313,8 @@ def milb_player_search(name,parent=None):
         return s['row'][0]
 
 def get_milb_season_stats(name, type="hitting",year=None):
+    # /api/v1/people/666198?hydrate=draft
+    # to get draft info on a player
     if 'parent=' in name:
         parentteam = name[name.find('=')+1:]
         print(parentteam)
@@ -2109,6 +2111,35 @@ def print_at_bats(name, delta=None):
                 output = output + _get_single_line_statcast(play['playEvents'][-1]) + "\n\n"
     return output
 
+def print_team_series(team):
+    teamid, teamdata = get_teamid(team, extradata=True)
+    now = _get_date_from_delta(0)
+    ed = "%d-%d-%d" % (now.year, now.month, now.day)
+    url = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=" + str(teamid) + \
+          "&gameType=R,F,D,L,W" \
+          "&startDate=2019-03-01" \
+          "&endDate=" + ed + \
+          "&hydrate=team,seriesStatus"
+    dates = utils.get_json(url)['dates']
+    series = []
+    for d in dates:
+        for g in d['games']:
+            # if g['seriesStatus']['isOver']:
+            if g['seriesStatus']['gameNumber'] == g['seriesStatus']['totalGames']:
+                s = dict()
+                if g['teams']['away']['team']['id'] == teamid:
+                    s['opp'] = g['teams']['home']['team']['abbreviation']
+                else:
+                    s['opp'] = g['teams']['away']['team']['abbreviation']
+                s['w'] = g['seriesStatus']['wins']
+                s['l'] = g['seriesStatus']['losses']
+                s['date'] = d['date'][5:]
+                series.append(s)
+    labels = ['date','opp','w','l']
+    output = utils.format_table(labels, series, left_list=labels)
+    output = "%s series results:\n" % (teamdata['teamName']) + output
+    return output
+
 def _get_single_line_statcast(play):
     curplayevent = play
     if 'type' in curplayevent['details']:
@@ -2246,4 +2277,5 @@ if __name__ == "__main__":
     # print(batter_or_pitcher_vs("strasburg","nym"))
     # print(print_at_bats("Chris Davis", delta="-1"))
     # print(get_all_game_highlights("565905"))
-    print(find_game_highlights('wsh', delta="-1"))
+    # print(find_game_highlights('wsh', delta="-1"))
+    print(print_team_series("wsh"))
