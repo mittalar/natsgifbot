@@ -45,306 +45,316 @@ class Baseball():
             direction = '+'
         return direction + str(delta.days)
 
-    @commands.command()
-    async def mlb(self,*team :str):
-        """Get MLB info
+    @commands.group(pass_context=True)
+    async def mlb(self, ctx):
+        if ctx.invoked_subcommand is None:
+            await self.bot.say("Invalid subcommand passed")
 
-        Help is now too long for a discord message. Check the github link for full help.
+    @mlb.command(pass_context=True, name='line')
+    async def mlb_line(self, ctx, *query:str):
+        player = ' '.join(query)
+        await self.bot.say("```%s```" % mymlbstats.get_player_line(player))
 
-        Supported sub commands:
-        blank
-        <team>
-        <division>
-        standings <division>
-        [l]sp <team>
-        line <player>
-        ohtani
-        <part> <team>
-        linescore <team>
-
-            each of the previous commands can end in a number of (+days or -days) to change the date
-
-        dl <team>
-        batters <team>
-        pitchers <team>
-
-        last [n] <team>
-        next [n] <team>
-
-        [h][c][b,p]stats <player> [year] [year2]
-        splits <split> <player> [year]
-        vs <team> <player>
-        [b]last <player> [n]
-        [b]log [n] <player>
-        [p,f]leaders <stat>
-
-        highlight <query>
-
-        help - https://github.com/efitz11/natsgifbot/blob/master/mlbhelp.txt
-        """
-        delta=None
-
-        team = ["wsh" if x.lower() == "nats" else x for x in team]
-
-        reddit = False
-        for i in team:
-            if i.lower() == 'reddit':
-                reddit = True
-                team.remove(i)
-
-        if len(team) > 0 and (team[-1].startswith('-') or team[-1].startswith('+')):
-            delta = team[-1]
-            team = team[:-1]
-        elif len(team) > 0 and len(team[-1].split('/')) in [2,3]:
-            delta = self.convert_date_to_delta(team)
-            team = team[:-1]
-        elif len(team) > 0 and team[-1].lower() in ['yesterday', 'tomorrow']:
-            if team[-1] == 'yesterday':
-                delta = "-1"
-            elif team[-1] == 'tomorrow':
-                delta = "+1"
-            team = team[:-1]
-
-        if len(team) == 0 or (len(team) == 1 and team[0] == 'live'):
-            liveonly=False
-            if len(team) == 1:
-                liveonly = True
-            output = mymlbstats.get_all_game_info(delta=delta, liveonly=liveonly)
-            await self.bot.say("```python\n" + output + "```")
-            return
-
-        if team[0] == 'help':
-            await self.bot.say("https://github.com/efitz11/natsgifbot/blob/master/mlbhelp.txt")
-            return
-
-        if team[0] in ["sp","lsp"]:
-            teamname = ' '.join(team[1:])
-            if team[0] == "lsp":
-                scoring_plays = mymlbstats.list_scoring_plays(teamname, delta,lastonly=True)
-            else:
-                scoring_plays = mymlbstats.list_scoring_plays(teamname, delta)
-            print(teamname,scoring_plays)
-            if len(scoring_plays) > 0:
-                output = "```"
-                lastinning = ""
-                for play in scoring_plays:
-                    if play[0] != lastinning:
-                        if len(lastinning) != 0:
-                            output = output + "```\n```"
-                            if len(output) + len(play[0]) > 1600:
-                                await self.bot.say(output[:-3])
-                                output = "```"
-                        output = output + play[0] + "\n"
-                        lastinning = play[0]
-                    output = output + "\t" + play[1] + "\n"
-                output = output + "```"
-                await self.bot.say(output)
-                return
-            else:
-                await self.bot.say("No scoring plays")
-                return
-        elif team[0] == 'homers':
-            teamname = ' '.join(team[1:])
-            await self.bot.say("```python\n%s```" % mymlbstats.list_home_runs(teamname, delta=delta))
-            return
-        elif team[0] == 'line':
-            player = '+'.join(team[1:])
-            if len(player) == 0:
-                out = get_daily_leaders(delta=delta)
-                await self.bot.say("ESPN's daily leaders:\n```%s```"% out)
-                return
-            else:
-                out = mymlbstats.get_player_line(player, delta)
-            if len(out) == 0:
-                await self.bot.say("couldn't find stats")
-            else:
-                await self.bot.say("```%s```" % out)
-            return
-        # elif team[0] in ['stats','bstats','pstats','hstats','hbstats','hpstats']:
-        elif team[0].endswith('stats'):
-            active = 'Y'
-            if team[0].startswith('h'):
-                team[0] = team[0][1:]
-                active = 'N'
-            career = False
-            if team[0].startswith('c'):
-                team[0] = team[0][1:]
-                career = True
-            year = None
-            year2 = None
-            if team[-1].isdigit():
-                year = team[-1]
-                team = team[0:-1]
-            if team[-1].isdigit():
-                year2 = year
-                year = team[-1]
-                team = team[0:-1]
-            player = '+'.join(team[1:])
-            t = None
-            if team[0] in ['bstats']:
-                t = "hitting"
-            elif team[0] == 'pstats':
-                t = "pitching"
-            await self.bot.say("```%s```" % mymlbstats.get_player_season_stats(player,type=t,year=year,year2=year2,active=active, career=career, reddit=reddit))
-            return
-        elif team[0] == 'compare':
-            year = None
-            if team[-1].isdigit():
-                year = team[-1]
-                team = team[0:-1]
-            team = team[1:]
-            playerlist = []
-            for t in team:
-                playerlist.append(t)
-            if year is None:
-                await self.bot.say("```%s```" % mymlbstats.compare_player_stats(playerlist, reddit=reddit))
-            else:
-                await self.bot.say("```%s```" % mymlbstats.compare_player_stats(playerlist, year=year, reddit=reddit))
-        elif team[0] == 'splits':
-            split = team[1]
-            if team[-1].isdigit():
-                year = team[-1]
-                player = ' '.join(team[2:-1])
-                await self.bot.say("```%s```" % mymlbstats.get_player_season_splits(player,split,year=year, reddit=reddit))
-            else:
-                player = ' '.join(team[2:])
-                await self.bot.say("```%s```" % mymlbstats.get_player_season_splits(player,split, reddit=reddit))
-            return
-        elif team[0] == 'vs':
-            opp = team[1]
-            year = None
-            if team[-1].isdigit():
-                year = team[-1]
-                team = team[0:-1]
-            #     player = ' '.join(team[2:-1])
-            #     await self.bot.say("```%s```" % mymlbstats.player_vs_team(player,opp,year=year))
-            # else:
-            player = ' '.join(team[2:])
-            # await self.bot.say("```%s```" % mymlbstats.player_vs_team(player,opp))
-            await self.bot.say("```%s```" % mymlbstats.batter_or_pitcher_vs(player,opp,year=year,reddit=reddit))
-            return
-        elif team[0] == 'bvp':
-            p1 = team[1]
-            p2 = team[2]
-            await self.bot.say("```%s```" % mymlbstats.player_vs_pitcher(p1, p2, reddit=reddit))
-        elif team[0].lower() in ["dl", "il"]:
-            team = ' '.join(team[1:])
-            await self.bot.say("```%s```" % mymlbstats.get_team_dl(team))
-            return
-        elif team[0] in ['batters','pitchers']:
-            h = (team[0] == 'batters')
-            team = ' '.join(team[1:])
-            await self.bot.say("```%s```" % mymlbstats.print_roster(team, hitters=h))
-        elif team[0] in ['past', 'next']:
-            num = 2
-            backwards = team[0] == 'past'
-            if team[1].isdigit():
-                num = int(team[1])
-                team = ' '.join(team[2:])
-            else:
-                team = ' '.join(team[1:])
-            await self.bot.say("```%s```" % mymlbstats.get_team_schedule(team,num,backward=backwards))
-            return
-        elif team[0].startswith("last") or team[0].startswith("blast"):
-            forcebatting = False
-            if team[0].startswith('blast'):
-                team[0] = team[0][1:]
-                forcebatting = True
-            if team[1].isdigit():
-                days = int(team[1])
-                team = team[2:]
-            else:
-                team = team[1:]
-                days = None
-            await self.bot.say("```%s```" % mymlbstats.get_player_trailing_splits('+'.join(team), days, forcebatting=forcebatting, reddit=reddit))
-            return
-        elif team[0].endswith("log"):
-            forcebatting = team[0].startswith("b")
-            if team[-1].isdigit():
-                num = int(team[-1])
-                team = team[:-1]
-            else:
-                num=5
-            player = '+'.join(team[1:])
-            await self.bot.say("```%s```" % mymlbstats.get_player_gamelogs(player,num,forcebatting=forcebatting))
-            return
-        elif team[0].endswith("leaders") or team[0].endswith("losers"):
-            stat = team[1]
-            opts = []
-            for i in range(2,len(team)):
-                opts.append(team[i])
-            stattype = 'bat'
-            if team[0].startswith('p'):
-                t = team[0][1:]
-                stattype = 'pit'
-            elif team[0].startswith('f'):
-                t = team[0][1:]
-                stattype = 'fld'
-            else:
-                t = team[0]
-            if t == "losers":
-                opts.append("reverse=yes")
-            fg = FG(stat.lower(),options=opts)
-            output = fg.get_stat_leaders_str(stattype=stattype)
-            await self.bot.say(output)
-            return
-        elif team[0] == 'ohtani':
-            out = mymlbstats.get_ohtani_line(delta)
-            if len(out) > 0:
-                await self.bot.say("```%s```" % out)
-            else:
-                await self.bot.say("No stats found")
-            return
-        elif team[0] in ['batting','pitching','notes','info','bench','bullpen']:
-            part = team[0]
-            team = ' '.join(team[1:]).lower()
-            out = mymlbstats.print_box(team, part=part, delta=delta)
-            if out is not None:
-                await self.bot.say("```%s```" % out)
-            return
-        elif team[0] == "linescore":
-            team = ' '.join(team[1:]).lower()
-            out = mymlbstats.print_linescore(team, delta=delta)
-            await self.bot.say("```%s```" % out)
-            return
-        elif team[0] == "highlight":
-            query = ' '.join(team[1:])
-            await self.bot.say(mymlbstats.search_highlights(query))
-            return
-        elif team[0] == "videos":
-            team = ' '.join(team[1:]).lower()
-            print(team)
-            # await self.bot.say(mymlbstats.find_game_highlights(team, delta=delta))
-            msg = utils.split_long_message(mymlbstats.find_game_highlights(team, delta=delta))
-            for m in msg:
-                await self.bot.say(m)
-        elif team[0] == "plays":
-            inning = int(team[-1])
-            team = ' '.join(team[1:-1]).lower()
-            await self.bot.say(mymlbstats.get_inning_plays(team, inning, delta=delta))
-        elif team[0] == "standings":
-            div = team[1]
-            await self.bot.say(mymlbstats.get_div_standings(div))
-        elif team[0] in ["broadcast","broadcasts"]:
-            team = ' '.join(team[1:]).lower()
-            out = mymlbstats.print_broadcasts(team, delta=delta)
-            await self.bot.say("```%s```" % out)
-        elif team[0] in ["longdongs", "shortdongs"]:
-            out = mymlbstats.print_dongs(team[0][:team[0].index('d')], delta=delta, reddit=reddit)
-            await self.bot.say("```%s```" % out)
-        elif team[0] in ["dongs", "newdongs"]:
-            out = mymlbstats.print_dongs("recent", delta=delta, reddit=reddit)
-            await self.bot.say("```%s```" % out)
-        elif team[0] == "abs":
-            team = ' '.join(team[1:]).lower()
-            await self.bot.say("```%s```" % mymlbstats.print_at_bats(team, delta=delta))
-        else:
-            teamname = ' '.join(team).lower()
-            output = mymlbstats.get_single_game(teamname,delta=delta)
-            if len(output) > 0:
-                await self.bot.say("```python\n" + output + "```")
-            else:
-                await self.bot.say("no games found")
+    # @commands.command()
+    # async def mlb(self,*team :str):
+    #     """Get MLB info
+    #
+    #     Help is now too long for a discord message. Check the github link for full help.
+    #
+    #     Supported sub commands:
+    #     blank
+    #     <team>
+    #     <division>
+    #     standings <division>
+    #     [l]sp <team>
+    #     line <player>
+    #     ohtani
+    #     <part> <team>
+    #     linescore <team>
+    #
+    #         each of the previous commands can end in a number of (+days or -days) to change the date
+    #
+    #     dl <team>
+    #     batters <team>
+    #     pitchers <team>
+    #
+    #     last [n] <team>
+    #     next [n] <team>
+    #
+    #     [h][c][b,p]stats <player> [year] [year2]
+    #     splits <split> <player> [year]
+    #     vs <team> <player>
+    #     [b]last <player> [n]
+    #     [b]log [n] <player>
+    #     [p,f]leaders <stat>
+    #
+    #     highlight <query>
+    #
+    #     help - https://github.com/efitz11/natsgifbot/blob/master/mlbhelp.txt
+    #     """
+    #     delta=None
+    #
+    #     team = ["wsh" if x.lower() == "nats" else x for x in team]
+    #
+    #     reddit = False
+    #     for i in team:
+    #         if i.lower() == 'reddit':
+    #             reddit = True
+    #             team.remove(i)
+    #
+    #     if len(team) > 0 and (team[-1].startswith('-') or team[-1].startswith('+')):
+    #         delta = team[-1]
+    #         team = team[:-1]
+    #     elif len(team) > 0 and len(team[-1].split('/')) in [2,3]:
+    #         delta = self.convert_date_to_delta(team)
+    #         team = team[:-1]
+    #     elif len(team) > 0 and team[-1].lower() in ['yesterday', 'tomorrow']:
+    #         if team[-1] == 'yesterday':
+    #             delta = "-1"
+    #         elif team[-1] == 'tomorrow':
+    #             delta = "+1"
+    #         team = team[:-1]
+    #
+    #     if len(team) == 0 or (len(team) == 1 and team[0] == 'live'):
+    #         liveonly=False
+    #         if len(team) == 1:
+    #             liveonly = True
+    #         output = mymlbstats.get_all_game_info(delta=delta, liveonly=liveonly)
+    #         await self.bot.say("```python\n" + output + "```")
+    #         return
+    #
+    #     if team[0] == 'help':
+    #         await self.bot.say("https://github.com/efitz11/natsgifbot/blob/master/mlbhelp.txt")
+    #         return
+    #
+    #     if team[0] in ["sp","lsp"]:
+    #         teamname = ' '.join(team[1:])
+    #         if team[0] == "lsp":
+    #             scoring_plays = mymlbstats.list_scoring_plays(teamname, delta,lastonly=True)
+    #         else:
+    #             scoring_plays = mymlbstats.list_scoring_plays(teamname, delta)
+    #         print(teamname,scoring_plays)
+    #         if len(scoring_plays) > 0:
+    #             output = "```"
+    #             lastinning = ""
+    #             for play in scoring_plays:
+    #                 if play[0] != lastinning:
+    #                     if len(lastinning) != 0:
+    #                         output = output + "```\n```"
+    #                         if len(output) + len(play[0]) > 1600:
+    #                             await self.bot.say(output[:-3])
+    #                             output = "```"
+    #                     output = output + play[0] + "\n"
+    #                     lastinning = play[0]
+    #                 output = output + "\t" + play[1] + "\n"
+    #             output = output + "```"
+    #             await self.bot.say(output)
+    #             return
+    #         else:
+    #             await self.bot.say("No scoring plays")
+    #             return
+    #     elif team[0] == 'homers':
+    #         teamname = ' '.join(team[1:])
+    #         await self.bot.say("```python\n%s```" % mymlbstats.list_home_runs(teamname, delta=delta))
+    #         return
+    #     elif team[0] == 'line':
+    #         player = '+'.join(team[1:])
+    #         if len(player) == 0:
+    #             out = get_daily_leaders(delta=delta)
+    #             await self.bot.say("ESPN's daily leaders:\n```%s```"% out)
+    #             return
+    #         else:
+    #             out = mymlbstats.get_player_line(player, delta)
+    #         if len(out) == 0:
+    #             await self.bot.say("couldn't find stats")
+    #         else:
+    #             await self.bot.say("```%s```" % out)
+    #         return
+    #     # elif team[0] in ['stats','bstats','pstats','hstats','hbstats','hpstats']:
+    #     elif team[0].endswith('stats'):
+    #         active = 'Y'
+    #         if team[0].startswith('h'):
+    #             team[0] = team[0][1:]
+    #             active = 'N'
+    #         career = False
+    #         if team[0].startswith('c'):
+    #             team[0] = team[0][1:]
+    #             career = True
+    #         year = None
+    #         year2 = None
+    #         if team[-1].isdigit():
+    #             year = team[-1]
+    #             team = team[0:-1]
+    #         if team[-1].isdigit():
+    #             year2 = year
+    #             year = team[-1]
+    #             team = team[0:-1]
+    #         player = '+'.join(team[1:])
+    #         t = None
+    #         if team[0] in ['bstats']:
+    #             t = "hitting"
+    #         elif team[0] == 'pstats':
+    #             t = "pitching"
+    #         await self.bot.say("```%s```" % mymlbstats.get_player_season_stats(player,type=t,year=year,year2=year2,active=active, career=career, reddit=reddit))
+    #         return
+    #     elif team[0] == 'compare':
+    #         year = None
+    #         if team[-1].isdigit():
+    #             year = team[-1]
+    #             team = team[0:-1]
+    #         team = team[1:]
+    #         playerlist = []
+    #         for t in team:
+    #             playerlist.append(t)
+    #         if year is None:
+    #             await self.bot.say("```%s```" % mymlbstats.compare_player_stats(playerlist, reddit=reddit))
+    #         else:
+    #             await self.bot.say("```%s```" % mymlbstats.compare_player_stats(playerlist, year=year, reddit=reddit))
+    #     elif team[0] == 'splits':
+    #         split = team[1]
+    #         if team[-1].isdigit():
+    #             year = team[-1]
+    #             player = ' '.join(team[2:-1])
+    #             await self.bot.say("```%s```" % mymlbstats.get_player_season_splits(player,split,year=year, reddit=reddit))
+    #         else:
+    #             player = ' '.join(team[2:])
+    #             await self.bot.say("```%s```" % mymlbstats.get_player_season_splits(player,split, reddit=reddit))
+    #         return
+    #     elif team[0] == 'vs':
+    #         opp = team[1]
+    #         year = None
+    #         if team[-1].isdigit():
+    #             year = team[-1]
+    #             team = team[0:-1]
+    #         #     player = ' '.join(team[2:-1])
+    #         #     await self.bot.say("```%s```" % mymlbstats.player_vs_team(player,opp,year=year))
+    #         # else:
+    #         player = ' '.join(team[2:])
+    #         # await self.bot.say("```%s```" % mymlbstats.player_vs_team(player,opp))
+    #         await self.bot.say("```%s```" % mymlbstats.batter_or_pitcher_vs(player,opp,year=year,reddit=reddit))
+    #         return
+    #     elif team[0] == 'bvp':
+    #         p1 = team[1]
+    #         p2 = team[2]
+    #         await self.bot.say("```%s```" % mymlbstats.player_vs_pitcher(p1, p2, reddit=reddit))
+    #     elif team[0].lower() in ["dl", "il"]:
+    #         team = ' '.join(team[1:])
+    #         await self.bot.say("```%s```" % mymlbstats.get_team_dl(team))
+    #         return
+    #     elif team[0] in ['batters','pitchers']:
+    #         h = (team[0] == 'batters')
+    #         team = ' '.join(team[1:])
+    #         await self.bot.say("```%s```" % mymlbstats.print_roster(team, hitters=h))
+    #     elif team[0] in ['past', 'next']:
+    #         num = 2
+    #         backwards = team[0] == 'past'
+    #         if team[1].isdigit():
+    #             num = int(team[1])
+    #             team = ' '.join(team[2:])
+    #         else:
+    #             team = ' '.join(team[1:])
+    #         await self.bot.say("```%s```" % mymlbstats.get_team_schedule(team,num,backward=backwards))
+    #         return
+    #     elif team[0].startswith("last") or team[0].startswith("blast"):
+    #         forcebatting = False
+    #         if team[0].startswith('blast'):
+    #             team[0] = team[0][1:]
+    #             forcebatting = True
+    #         if team[1].isdigit():
+    #             days = int(team[1])
+    #             team = team[2:]
+    #         else:
+    #             team = team[1:]
+    #             days = None
+    #         await self.bot.say("```%s```" % mymlbstats.get_player_trailing_splits('+'.join(team), days, forcebatting=forcebatting, reddit=reddit))
+    #         return
+    #     elif team[0].endswith("log"):
+    #         forcebatting = team[0].startswith("b")
+    #         if team[-1].isdigit():
+    #             num = int(team[-1])
+    #             team = team[:-1]
+    #         else:
+    #             num=5
+    #         player = '+'.join(team[1:])
+    #         await self.bot.say("```%s```" % mymlbstats.get_player_gamelogs(player,num,forcebatting=forcebatting))
+    #         return
+    #     elif team[0].endswith("leaders") or team[0].endswith("losers"):
+    #         stat = team[1]
+    #         opts = []
+    #         for i in range(2,len(team)):
+    #             opts.append(team[i])
+    #         stattype = 'bat'
+    #         if team[0].startswith('p'):
+    #             t = team[0][1:]
+    #             stattype = 'pit'
+    #         elif team[0].startswith('f'):
+    #             t = team[0][1:]
+    #             stattype = 'fld'
+    #         else:
+    #             t = team[0]
+    #         if t == "losers":
+    #             opts.append("reverse=yes")
+    #         fg = FG(stat.lower(),options=opts)
+    #         output = fg.get_stat_leaders_str(stattype=stattype)
+    #         await self.bot.say(output)
+    #         return
+    #     elif team[0] == 'ohtani':
+    #         out = mymlbstats.get_ohtani_line(delta)
+    #         if len(out) > 0:
+    #             await self.bot.say("```%s```" % out)
+    #         else:
+    #             await self.bot.say("No stats found")
+    #         return
+    #     elif team[0] in ['batting','pitching','notes','info','bench','bullpen']:
+    #         part = team[0]
+    #         team = ' '.join(team[1:]).lower()
+    #         out = mymlbstats.print_box(team, part=part, delta=delta)
+    #         if out is not None:
+    #             await self.bot.say("```%s```" % out)
+    #         return
+    #     elif team[0] == "linescore":
+    #         team = ' '.join(team[1:]).lower()
+    #         out = mymlbstats.print_linescore(team, delta=delta)
+    #         await self.bot.say("```%s```" % out)
+    #         return
+    #     elif team[0] == "highlight":
+    #         query = ' '.join(team[1:])
+    #         await self.bot.say(mymlbstats.search_highlights(query))
+    #         return
+    #     elif team[0] == "videos":
+    #         team = ' '.join(team[1:]).lower()
+    #         print(team)
+    #         # await self.bot.say(mymlbstats.find_game_highlights(team, delta=delta))
+    #         msg = utils.split_long_message(mymlbstats.find_game_highlights(team, delta=delta))
+    #         for m in msg:
+    #             await self.bot.say(m)
+    #     elif team[0] == "plays":
+    #         inning = int(team[-1])
+    #         team = ' '.join(team[1:-1]).lower()
+    #         await self.bot.say(mymlbstats.get_inning_plays(team, inning, delta=delta))
+    #     elif team[0] == "standings":
+    #         div = team[1]
+    #         await self.bot.say(mymlbstats.get_div_standings(div))
+    #     elif team[0] in ["broadcast","broadcasts"]:
+    #         team = ' '.join(team[1:]).lower()
+    #         out = mymlbstats.print_broadcasts(team, delta=delta)
+    #         await self.bot.say("```%s```" % out)
+    #     elif team[0] in ["longdongs", "shortdongs"]:
+    #         out = mymlbstats.print_dongs(team[0][:team[0].index('d')], delta=delta, reddit=reddit)
+    #         await self.bot.say("```%s```" % out)
+    #     elif team[0] in ["dongs", "newdongs"]:
+    #         out = mymlbstats.print_dongs("recent", delta=delta, reddit=reddit)
+    #         await self.bot.say("```%s```" % out)
+    #     elif team[0] == "abs":
+    #         team = ' '.join(team[1:]).lower()
+    #         await self.bot.say("```%s```" % mymlbstats.print_at_bats(team, delta=delta))
+    #     else:
+    #         teamname = ' '.join(team).lower()
+    #         output = mymlbstats.get_single_game(teamname,delta=delta)
+    #         if len(output) > 0:
+    #             await self.bot.say("```python\n" + output + "```")
+    #         else:
+    #             await self.bot.say("no games found")
 
     #######################################
     ##### BEGIN MINOR LEAGUE COMMANDS #####
